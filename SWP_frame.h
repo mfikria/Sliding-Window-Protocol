@@ -1,3 +1,6 @@
+#ifndef _SWP_FRAME_H_
+#define _SWP_FRAME_H_
+
 #include "dcomm.h"
 #include "crc16.h"
 #include <string.h>
@@ -55,3 +58,5 @@ void stringToFrame(FRAME *frame, char *dataFrame) {
     frame->etx = dataFrame[3+DATASIZE];
     shortToString(&*dataFrame, &(frame->checksum), (3+DATASIZE+1));
 }
+
+#endif
