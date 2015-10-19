@@ -23,7 +23,6 @@ int sockfd,
 		remAddrLen = sizeof(remAddr);
 
 /* Global Variables */
-FRAME tframe = {SOH,}
 int flagXOFF = 0,
 		flagXON = 1,
 		countSendBytes = 0,

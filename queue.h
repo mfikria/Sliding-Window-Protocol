@@ -1,3 +1,6 @@
+#ifndef _QUEUE_H_
+#define _QUEUE_H_
+
 #include "SWP_frame.h"
 #define QUEUESIZE  5
 
@@ -7,3 +10,5 @@ typedef struct {
         int tail;                       /* position of last element */
         int count;                      /* number of queue elements */
 } QFRAME;
+
+#endif
