@@ -1,18 +1,12 @@
 #include "dcomm.h"
 #include "SWP_frame.h"
-#include "queue.h"
-
-/* Delay to adjust speed in milliseconds */
-#define DELAY 500
-
-Byte rxbuf[RXQSIZE];
-QTYPE rcvq = { 0, 0, 0, RXQSIZE, rxbuf };
-QTYPE *rxq = &rcvq;
+#include "SWP_ack.h"
 
 /* Threads */
-pthread_t tid;
+pthread_t tid[2];
 pthread_mutex_t lock;
-void* mainThread(void* threadArgs);
+void* bufferingFrame(void* threadArgs);
+void* transmitingFrame(void* threadArgs);
 
 /* Making-Connection-related Variables */
 const char *hostname;	/* change this to use a different hostname */
@@ -22,17 +16,17 @@ struct sockaddr_in remAddr;
 int sockfd,
 		remAddrLen = sizeof(remAddr);
 
+FRAMEBUF framebuf[BUFSIZE];
+
 /* Global Variables */
-int flagXOFF = 0,
-		flagXON = 1,
-		countSendBytes = 0,
-		countSendFrames  = 0,
-		rcvdBytesLen = 0;
-Byte buffer[5],
-			controlChar = XON;
+int countSendFrames  = 0,
+		countBufFrames = 0,
+		countRcvdAcks  = 0,
+		isDone = 0;
+
 FILE* file;
 
-QFRAME qframe;
+slidingWindow window ={0, WINSIZE - 1};
 
 int main(int argc, char const *argv[]) {
 
@@ -65,35 +59,53 @@ int main(int argc, char const *argv[]) {
     return 1;
 	}
 
-	/* Create main thread */
-	pthread_create(&tid, NULL, mainThread, NULL); // thread for sending character from file
+	pthread_create(&tid[0], NULL, bufferingFrame, NULL); // Thread for buffering data and set frame from file to buffef frame
+	pthread_create(&tid[1], NULL, transmitingFrame, NULL); //
 
-	while(1){
-		rcvdBytesLen = recvfrom(sockfd, buffer, MAXLEN, 0, (struct sockaddr *)&remAddr, &remAddrLen);
-		if(rcvdBytesLen > 0){
-			controlChar = buffer[0];
-			if(controlChar == XOFF && flagXOFF == 1){
-				printf("XOFF diterima\n");
-				flagXON = 1;
-				flagXOFF = 0;
+	ACKN ackn;
+	while(1)
+	{
+		if(recvfrom(sockfd, &ackn, ACKNSIZE, 0, (struct sockaddr *)&remAddr, &remAddrLen) > 0)
+		{
+			if(ackn.ack == ACK && ackn.checksum == calc_crc16(serializeFrame(framebuf[ackn.frameno].frame)))
+			{
+				framebuf[ackn.frameno].status = 2;
 			}
-			else if(controlChar == XON && flagXON == 1){
-				printf("XON diterima\n");
-				flagXON = 0;
-				flagXOFF = 1;
+			else
+			{
+				if(sendto(sockfd, &framebuf[ackn.frameno].frame, FRAMESIZE, 0, (struct sockaddr *)&remAddr, remAddrLen) < 0)
+				{
+					perror("Failed to Send.");
+					return 0;
+				}
+			}
+
+			if(framebuf[window.head].status == 2)
+			{
+				int numMove = 0;
+				int j;
+				for(j = window.head; (j <= window.tail) && (framebuf[j].status == 2); j++)
+				{
+					numMove++;
+				}
+				window.head += numMove;
+				window.tail += numMove;
 			}
 		}
-		usleep(DELAY*1000); // delay time for Checking-Acknowledgement process
 	}
 
-	pthread_join(tid, NULL);
+	pthread_join(tid[0], NULL);
+	pthread_join(tid[1], NULL);
 	pthread_mutex_destroy(&lock);
 
 	return 0;
 }
 
-void* mainThread(void* threadArgs) {
+void* bufferingFrame(void* threadArgs)
+{
 	pthread_mutex_lock(&lock);
+	Byte buffer[DATASIZE];
+	FRAME frame;
 
 	char ch;
 	file = fopen(fileInput, "r");
@@ -102,40 +114,61 @@ void* mainThread(void* threadArgs) {
 		return 0;
 	}
 
-	int i = 0;
+	int scanfile;
 
-	init_queue(&qframe);
-	while() {
-		countSendBytes = 0;
-		FRAME _frame;
-		if(controlChar == XON){
+	do
+	{
+		memset(buffer, 0, DATASIZE);
+		scanfile = fscanf(file, "%c", &ch);
+		int i;
+		for(i = 0; (i < DATASIZE) && (scanfile != EOF); i++)
+		{
+			// buffering data
+			buffer[i] = ch;
 			scanfile = fscanf(file, "%c", &ch);
-
-			while( (scanfile != EOF) && (countSendBytes < 5) ){ /* Masukan ke buffer */
-				buffer[countSendBytes++] = ch;
-				scanfile = fscanf(file, "%c", &ch);
-			}
-			_frame = setFrame(buffer, 5, countSendFrames);
-			enqueue(&qframe, &_frame);
-			printf("Mengirim frame ke-%d: '%s'\n", countSendFrames++, buffer);
-			ssize_t lengthSentBytes = sendto(sockfd, frameToCharAll(_frame, 5), 6 + 5, 0, (struct sockaddr *)&remAddr, remAddrLen);
-			if(lengthSentBytes < 0){
-				perror("Failed to Send");
-				return 0;
-			}
-			usleep(DELAY*1000); // delay time for Sending-Character process
-		} else{
-			printf("Menunggu XON...\n");
 		}
-	}
-	if(scanfile == EOF){
-		printf("Pembacaan dan pengiriman selesai...\n");
+		setFrame(&frame, buffer, countBufFrames);
+
+		// Buffering frame's data and attributes to frame buffer element
+		framebuf[countBufFrames].status = 1;
+		transferFrame(&framebuf[countBufFrames++].frame, frame);
+	}	while(scanfile != EOF);
+
+	if(scanfile == EOF)
+	{
+		isDone = 1;
+		printf("EOF reached. Buffering frame done.\n");
 	}
 
 	fclose(file);
-	close(sockfd);
-
 	pthread_mutex_unlock(&lock);
+	return NULL;
+}
 
+void* transmitingFrame(void* threadArgs)
+{
+	pthread_mutex_lock(&lock);
+	int i, j;
+	while(1)
+	{
+		int k = window.head;
+		for(i = k; i < k + WINSIZE; i++)
+		{
+			usleep(DELAY * 20);
+			while(framebuf[i].status == 0 && !isDone); // Wait for the buffered frame
+			if(framebuf[i].status == 1)
+			{
+				printf("Sending frame-%d\n", countSendFrames++);
+				if(sendto(sockfd, &framebuf[i].frame, FRAMESIZE, 0, (struct sockaddr *)&remAddr, remAddrLen) < 0)
+				{
+					perror("Failed to Send.");
+					return 0;
+				}
+			}
+		}
+	}
+
+	close(sockfd);
+	pthread_mutex_unlock(&lock);
 	return NULL;
 }

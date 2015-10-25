@@ -1,3 +1,4 @@
+
 /*
 * File : dcomm.h
 */
@@ -28,26 +29,22 @@
 #define Endfile 26 /*End of file character */
 #define ESC 27 /*ESC key */
 
-/* XON/XOFF protocol */
-#define XON (0x11)
-#define XOFF (0x13)
-
 /* Const */
 #define BYTESIZE 256 	/* The maximum value of a byte */
 #define MAXLEN 1024		/* Maximum messages length */
-#define WINSIZE 5		/* Window size */
-#define DATASIZE 5	/* data frame size */
-#define ACKSIZE 6		/* Acknowledgement size */
+#define WINSIZE 5			/* Window size */
+#define DATASIZE 5		/* data frame size */
+#define FRAMESIZE 13	/* data frame size */
+#define ACKNSIZE 6		/* Acknowledgement size */
+#define QFRAMESIZE 15 /* Size of Circular Queue */
+#define BUFSIZE 255		/* Size of frame buffer */
+#define DELAY 500			/* Delay to adjust speed in milliseconds */
 
 typedef unsigned char Byte;
-typedef struct QTYPE
-{
-	unsigned int count;
-	unsigned int front;
-	unsigned int rear;
-	unsigned int maxsize;
-	Byte *data;
-} QTYPE;
 
+typedef struct sw {
+	int head;	// indicate index of first window's frame in frame buffer
+	int tail;	// indicate index of last window's frame in frame buffer
+} slidingWindow;
 
 #endif
