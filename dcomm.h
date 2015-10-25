@@ -39,6 +39,7 @@
 #define QFRAMESIZE 15 /* Size of Circular Queue */
 #define BUFSIZE 255		/* Size of frame buffer */
 #define DELAY 500			/* Delay to adjust speed in milliseconds */
+#define BITPATTERN 0x8408
 
 typedef unsigned char Byte;
 

@@ -49,9 +49,13 @@ unsigned int compareChecksum(FRAME frame);
 	compare checksum value from serializing frame's data and frame's attribute
 */
 
-unsigned short calc_crc16(char *data_p);
+unsigned short crc16(char *data_p);
 /*
-	Get frame's checksum value using CRC 16 method
+	Metode crc yang digunakan adalah dengan CCITT CRC 16 dengan
+	menggunakan polinomial X^16  + X^12  + X^5  + 1. Dalam kasus ini
+	kami menggunakan bit pattern 0x8408. Bit yang tinggi diasumsikan
+	untuk selalu diset dan karena itu kita menggunakan 16 bits untuk
+	merepresentasikan 17 bit data
 */
 
 int isValidFrame(FRAME frame);

@@ -68,12 +68,12 @@ int main(int argc, char const *argv[]) {
 
 		if(recvfrom(sockfd, &ackn, sizeof(ACKN), 0, (struct sockaddr *)&remAddr, &remAddrLen) > 0)
 		{
-			if(ackn.ack == ACK && ackn.checksum == calc_crc16(serializeFrame(framebuf[ackn.frameno].frame)))
+			if(ackn.ack == ACK && ackn.checksum == crc16(serializeFrame(framebuf[ackn.frameno].frame)))
 			{
 				printf("ACK received\n");
 				framebuf[ackn.frameno].status = 2;
 			}
-			else if(ackn.ack == ACK && ackn.checksum != calc_crc16(serializeFrame(framebuf[ackn.frameno].frame))){
+			else if(ackn.ack == ACK && ackn.checksum != crc16(serializeFrame(framebuf[ackn.frameno].frame))){
 				printf("ACK error received\n");
 			}
 			else if(ackn.ack == NAK){

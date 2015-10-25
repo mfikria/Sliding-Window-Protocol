@@ -3,8 +3,8 @@
 
 void setAck(ACKN *ackn, FRAME frame)
 {
-	unsigned short cs = calc_crc16(serializeFrame(frame));
-	/*
+	unsigned short cs = crc16(serializeFrame(frame));
+
 	if(cs == frame.checksum)
 	{
 		ackn->ack = ACK;
@@ -12,7 +12,7 @@ void setAck(ACKN *ackn, FRAME frame)
 	else
 	{
 		ackn->ack = NAK;
-	}*/
+	}
 
 	int random = rand() % 3;
 	if(random == 0){
