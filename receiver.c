@@ -1,10 +1,8 @@
 /*
 * File : receiver.cpp
 */
-#include "qframe.h"
 #include "SWP_ack.h"
 #include "SWP_frame.h"
-#include "qframe.h"
 
 /* Socket */
 int sockfd; // listen on sock_fd
@@ -19,6 +17,7 @@ static int countRcvdFrames = 0,   // number of Received Bytes
 int servicePort;
 
 FRAMEBUF framebuf[BUFSIZE];
+slidingWindow window ={0, WINSIZE - 1};
 
 int main(int argc, char *argv[]){
 
@@ -68,6 +67,17 @@ int main(int argc, char *argv[]){
 			{
 				perror("Failed to Send.");
 				return 0;
+			}
+			if(framebuf[window.head].status == 1)
+			{
+				int numMove = 0;
+				int j;
+				for(j = window.head; (j <= window.tail) && (framebuf[j].status == 1); j++)
+				{
+					numMove++;
+				}
+				window.head += numMove;
+				window.tail += numMove;
 			}
 		}
   }
