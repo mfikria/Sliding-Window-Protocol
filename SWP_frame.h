@@ -21,10 +21,11 @@ typedef struct FRAMEBUFS{
 	/*
 		status of frame:
 		in transmitter: 2 -> sending frame success (get ACK)
-                    1 -> frame has been buffered and ready to be sent
-										0 -> frame have not been sent OR error while sending frame (get NAK)
-		in receiver		: 1 -> frame has been delivered in receiver
-										0 -> frame has not been delivered yet
+                    	1 -> frame has been buffered and ready to be sent
+						0 -> frame have not been sent OR error while sending frame (get NAK)
+
+		in receiver	  : 1 -> frame has been delivered in receiver
+						0 -> frame has not been delivered yet
 	*/
 } FRAMEBUF;
 

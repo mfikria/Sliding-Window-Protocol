@@ -3,7 +3,7 @@ CFLAGS = -g
 # uncomment this for SunOS
 # LIBS = -lsocket -lnsl
 
-all:transmitter receiver
+all: clean transmitter receiver
 
 transmitter: transmitter.c
 	$(CC) -pthread -o transmitter transmitter.c SWP_frame.c $(LIBS)

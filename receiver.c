@@ -54,24 +54,32 @@ int main(int argc, char *argv[]){
 		FRAME frame;
 		if(recvfrom(sockfd, &frame, sizeof(FRAME), 0, (struct sockaddr *)&remAddr, &remAddrLen) >= 0)
 		{
-			printf("Frame-%d received: %s\n", frame.frameno, getDataFrame(frame));
-
-			printFrame(frame);
+			//printFrame(frame);
 			ACKN ackn;
-			setAck(&ackn, frame);
+			setAck(&ackn, frame); // 
 			//printAck(ackn);
+
+			/* frame format checking */
 			if(isValidFrame(frame))
 			{
-				transferFrame(&framebuf[frame.frameno].frame, frame);
+				transferFrame(&framebuf[frame.frameno].frame, frame); // insert frame into receiver buffer
 				framebuf[frame.frameno].status = 1;
 			}
 
-			if(ackn.ack == ACK){
+			printf("Frame-%d received ", frame.frameno);
+
+			/* send message according to frame status */
+			if(ackn.ack == ACK)
+			{
+				printf(": %s\n", getDataFrame(frame));
 				printf("Sending ACK-%d\n", ackn.frameno);
 			}
-			else
+			else if(ackn.ack == NAK)
 			{
-				printf("Sending NAK-%d\n", ackn.frameno);
+				printf("\nSending NAK-%d\n", ackn.frameno);
+			}
+			else{
+				printf("\nBlank\n");
 			}
 
 			if(sendto(sockfd, &ackn, sizeof(ACKN), 0, (struct sockaddr *)&remAddr, remAddrLen) < 0)

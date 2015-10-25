@@ -20,7 +20,7 @@ FRAMEBUF framebuf[BUFSIZE];
 
 /* Global Variables */
 int countSendFrames  = 0,
-		countBufFrames = 0,
+		countBufFrames = 0, // frame number
 		countRcvdAcks  = 0,
 		isDone = 0;
 
@@ -70,10 +70,18 @@ int main(int argc, char const *argv[]) {
 		{
 			if(ackn.ack == ACK && ackn.checksum == calc_crc16(serializeFrame(framebuf[ackn.frameno].frame)))
 			{
+				printf("ACK received\n");
 				framebuf[ackn.frameno].status = 2;
+			}
+			else if(ackn.ack == ACK && ackn.checksum != calc_crc16(serializeFrame(framebuf[ackn.frameno].frame))){
+				printf("ACK error received\n");
+			}
+			else if(ackn.ack == NAK){
+				printf("NAK received\n");
 			}
 			else
 			{
+				printf("ACK lost\n");
 				/*
 				if(sendto(sockfd, &framebuf[ackn.frameno].frame, sizeof(FRAME), 0, (struct sockaddr *)&remAddr, remAddrLen) < 0)
 				{
@@ -82,7 +90,7 @@ int main(int argc, char const *argv[]) {
 				}
 				*/
 			}
-			/*
+			
 			if(framebuf[window.head].status == 2)
 			{
 				int numMove = 0;
@@ -94,7 +102,7 @@ int main(int argc, char const *argv[]) {
 				window.head += numMove;
 				window.tail += numMove;
 			}
-			*/
+			
 			//usleep(DELAY* 1000);
 		}
 	}
@@ -135,6 +143,7 @@ void* bufferingFrame(void* threadArgs)
 			scanfile = fscanf(file, "%c", &ch);
 		}
 
+		// Insert data from text and frame number to Frame
 		setFrame(&frame, buffer, countBufFrames);
 
 		// Buffering frame's data and attributes to frame buffer element
@@ -157,6 +166,7 @@ void* transmitingFrame(void* threadArgs)
 {
 
 	int i, j;
+
 	while(1)
 	{
 		pthread_mutex_lock(&lock);
@@ -167,18 +177,18 @@ void* transmitingFrame(void* threadArgs)
 			if(framebuf[i].status == 1)
 			{
 				printf("Sending frame-%d\n", i);
-				printFrame(framebuf[i].frame);
 				if(sendto(sockfd, &framebuf[i].frame, sizeof(FRAME), 0, (struct sockaddr *)&remAddr, remAddrLen) < 0)
 				{
 					perror("Failed to Send.");
 					return 0;
 				}
 			}
+			usleep(DELAY*2000);
 		}
 		printf("--------------------\n\n");
-		//usleep(DELAY*1000);
+
 		pthread_mutex_unlock(&lock);
-		usleep(DELAY*5000);
+		usleep(DELAY*WINSIZE*1000);
 	}
 
 	return NULL;
