@@ -65,7 +65,8 @@ int main(int argc, char const *argv[]) {
 	ACKN ackn;
 	while(1)
 	{
-		if(recvfrom(sockfd, &ackn, ACKNSIZE, 0, (struct sockaddr *)&remAddr, &remAddrLen) > 0)
+
+		if(recvfrom(sockfd, &ackn, sizeof(ACKN), 0, (struct sockaddr *)&remAddr, &remAddrLen) > 0)
 		{
 			if(ackn.ack == ACK && ackn.checksum == calc_crc16(serializeFrame(framebuf[ackn.frameno].frame)))
 			{
@@ -73,13 +74,15 @@ int main(int argc, char const *argv[]) {
 			}
 			else
 			{
-				if(sendto(sockfd, &framebuf[ackn.frameno].frame, FRAMESIZE, 0, (struct sockaddr *)&remAddr, remAddrLen) < 0)
+				/*
+				if(sendto(sockfd, &framebuf[ackn.frameno].frame, sizeof(FRAME), 0, (struct sockaddr *)&remAddr, remAddrLen) < 0)
 				{
 					perror("Failed to Send.");
 					return 0;
 				}
+				*/
 			}
-
+			/*
 			if(framebuf[window.head].status == 2)
 			{
 				int numMove = 0;
@@ -91,11 +94,15 @@ int main(int argc, char const *argv[]) {
 				window.head += numMove;
 				window.tail += numMove;
 			}
+			*/
+			//usleep(DELAY* 1000);
 		}
 	}
 
+
 	pthread_join(tid[0], NULL);
 	pthread_join(tid[1], NULL);
+	close(sockfd);
 	pthread_mutex_destroy(&lock);
 
 	return 0;
@@ -103,9 +110,8 @@ int main(int argc, char const *argv[]) {
 
 void* bufferingFrame(void* threadArgs)
 {
-	pthread_mutex_lock(&lock);
+
 	Byte buffer[DATASIZE];
-	FRAME frame;
 
 	char ch;
 	file = fopen(fileInput, "r");
@@ -114,61 +120,66 @@ void* bufferingFrame(void* threadArgs)
 		return 0;
 	}
 
-	int scanfile;
-
-	do
+	int scanfile = fscanf(file, "%c", &ch);
+	while(scanfile != EOF)
 	{
+		FRAME frame;
+		pthread_mutex_lock(&lock);
 		memset(buffer, 0, DATASIZE);
-		scanfile = fscanf(file, "%c", &ch);
 		int i;
+		printf("Buffering frame-%d\n", countBufFrames);
 		for(i = 0; (i < DATASIZE) && (scanfile != EOF); i++)
 		{
 			// buffering data
 			buffer[i] = ch;
 			scanfile = fscanf(file, "%c", &ch);
 		}
+
 		setFrame(&frame, buffer, countBufFrames);
 
 		// Buffering frame's data and attributes to frame buffer element
 		framebuf[countBufFrames].status = 1;
 		transferFrame(&framebuf[countBufFrames++].frame, frame);
-	}	while(scanfile != EOF);
 
+		pthread_mutex_unlock(&lock);
+		usleep(DELAY*1000);
+	}
 	if(scanfile == EOF)
 	{
 		isDone = 1;
 		printf("EOF reached. Buffering frame done.\n");
+		fclose(file);
 	}
-
-	fclose(file);
-	pthread_mutex_unlock(&lock);
 	return NULL;
 }
 
 void* transmitingFrame(void* threadArgs)
 {
-	pthread_mutex_lock(&lock);
+
 	int i, j;
 	while(1)
 	{
+		pthread_mutex_lock(&lock);
 		int k = window.head;
+		printf("\n--------------------\n");
 		for(i = k; i < k + WINSIZE; i++)
 		{
-			usleep(DELAY * 20);
-			while(framebuf[i].status == 0 && !isDone); // Wait for the buffered frame
 			if(framebuf[i].status == 1)
 			{
-				printf("Sending frame-%d\n", countSendFrames++);
-				if(sendto(sockfd, &framebuf[i].frame, FRAMESIZE, 0, (struct sockaddr *)&remAddr, remAddrLen) < 0)
+				printf("Sending frame-%d\n", i);
+				printFrame(framebuf[i].frame);
+				if(sendto(sockfd, &framebuf[i].frame, sizeof(FRAME), 0, (struct sockaddr *)&remAddr, remAddrLen) < 0)
 				{
 					perror("Failed to Send.");
 					return 0;
 				}
 			}
 		}
+		printf("--------------------\n\n");
+		//usleep(DELAY*1000);
+		pthread_mutex_unlock(&lock);
+		usleep(DELAY*5000);
 	}
 
-	close(sockfd);
-	pthread_mutex_unlock(&lock);
 	return NULL;
 }

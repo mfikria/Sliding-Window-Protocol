@@ -2,7 +2,7 @@
 
 char* serializeFrame(FRAME frame)
 {
-    char* sFrame = (char*) malloc(FRAMESIZE * sizeof(char));
+    char* sFrame = (char*) malloc((DATASIZE+4)*sizeof(char));
     sFrame[0] = frame.soh;
     sFrame[1] = frame.frameno;
     sFrame[2] = frame.stx;
@@ -18,8 +18,9 @@ void setFrame(FRAME *frame, char *data, int frameno)
     frame->soh = SOH;
     frame->frameno = frameno;
     frame->stx = STX;
-    for (i = 0; i < DATASIZE; ++i) {
-        frame->data[i] = data[i];
+    for (i = 0; i < DATASIZE; ++i)
+    {
+      frame->data[i] = data[i];
     }
     frame->etx = ETX;
     frame->checksum = calc_crc16(serializeFrame(*frame));
@@ -43,16 +44,33 @@ unsigned int compareChecksum(FRAME frame)
 	return calc_crc16(serializeFrame(frame)) == frame.checksum ? ACK : NAK;
 }
 
-unsigned short calc_crc16(char *buf)
+unsigned short calc_crc16(char *data_p)
 {
-    unsigned short crc = 0xFFFF;
-    unsigned short i;
+      unsigned char i;
+      unsigned int data;
+      unsigned int crc = 0xffff;
+      int length = 4 + DATASIZE;
 
-    for (i=0; buf[i] != 0; i++) {
-        crc = ((crc << 8) & 0xFFFF) ^ crctab[(crc >> 8) ^ (buf[i] & 0xFF)];
-    }
+      if (length == 0)
+            return (~crc);
 
-    return crc;
+      do
+      {
+            for (i=0, data=(unsigned int)0xff & *data_p++;
+                 i < 8;
+                 i++, data >>= 1)
+            {
+                  if ((crc & 0x0001) ^ (data & 0x0001))
+                        crc = (crc >> 1) ^ POLY;
+                  else  crc >>= 1;
+            }
+      } while (--length);
+
+      crc = ~crc;
+      data = crc;
+      crc = (crc << 8) | (data >> 8 & 0xff);
+
+      return (crc);
 }
 
 int isValidFrame(FRAME frame)
@@ -63,10 +81,20 @@ int isValidFrame(FRAME frame)
 char* getDataFrame(FRAME frame)
 {
   char* str = (char*) malloc((DATASIZE) * sizeof(char));
-  sprintf(str, "%s", frame.data);
+  //sprintf(str, "%s", frame.data);
+  int i;
+  for(i = 0; i < DATASIZE; i++)
+  {
+    str[i] = frame.data[i];
+  }
   return str;
 }
 
 int isValidChar(char inChar){
   return (inChar >= 32 || inChar == CR || inChar == Endfile || inChar == LF);
+}
+
+void printFrame (FRAME frame)
+{
+  printf("\n%d\n%d\n%d\n%s\n%d\n%hu\n", frame.soh, frame.frameno, frame.stx, getDataFrame(frame), frame.etx, frame.checksum);
 }
