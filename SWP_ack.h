@@ -12,5 +12,5 @@ typedef struct
 } ACKN;
 
 void setAck(ACKN *ack, FRAME frame);
-
+void printAck(ACKN ack);
 #endif

@@ -52,22 +52,34 @@ int main(int argc, char *argv[]){
 
   while (1) {
 		FRAME frame;
-		if(recvfrom(sockfd, &frame, FRAMESIZE, 0, (struct sockaddr *)&remAddr, &remAddrLen) > 0)
+		if(recvfrom(sockfd, &frame, sizeof(FRAME), 0, (struct sockaddr *)&remAddr, &remAddrLen) >= 0)
 		{
+			printf("Frame-%d received: %s\n", frame.frameno, getDataFrame(frame));
+
+			printFrame(frame);
 			ACKN ackn;
 			setAck(&ackn, frame);
+			//printAck(ackn);
 			if(isValidFrame(frame))
 			{
 				transferFrame(&framebuf[frame.frameno].frame, frame);
 				framebuf[frame.frameno].status = 1;
-				printf("Frame-%d received: %s\n", frame.frameno, getDataFrame(frame));
 			}
 
-			if(sendto(sockfd, &ackn, ACKNSIZE, 0, (struct sockaddr *)&remAddr, remAddrLen) < 0)
+			if(ackn.ack == ACK){
+				printf("Sending ACK-%d\n", ackn.frameno);
+			}
+			else
+			{
+				printf("Sending NAK-%d\n", ackn.frameno);
+			}
+
+			if(sendto(sockfd, &ackn, sizeof(ACKN), 0, (struct sockaddr *)&remAddr, remAddrLen) < 0)
 			{
 				perror("Failed to Send.");
 				return 0;
 			}
+
 			if(framebuf[window.head].status == 1)
 			{
 				int numMove = 0;
@@ -81,5 +93,6 @@ int main(int argc, char *argv[]){
 			}
 		}
   }
+
 	return 0;
 }
